@@ -1,0 +1,50 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Transform: AWS::Serverless-2016-10-31
+Description: SAM Template to deploy lambda function from this repository.
+
+Resources:
+
+  ConfigureEKSControlPlaneLambda:
+    Type: AWS::Serverless::Function
+    Properties:
+      CodeUri: functions/ConfigureEKSControlPlane/
+      Handler: lambda_function.lambda_handler
+      FunctionName: 'cfn-configure-eks-control-plane'
+      MemorySize: 256
+      Runtime: python3.7
+      Role: !GetAtt ConfigureEKSControlPlaneLambdaRole.Arn
+      Timeout: 900
+
+  ConfigureEKSControlPlaneLambdaRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lambda.amazonaws.com
+            Action:
+              - sts:AssumeRole
+      Path: /
+      Policies:
+        - PolicyName: ConfigureEKSControlPlaneLambdaRolePolicies
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - eks:DescribeCluster
+                  - eks:DescribeUpdate
+                  - eks:UpdateClusterConfig
+                Resource:
+                  - !Sub 'arn:aws:eks:${AWS::Region}:${AWS::AccountId}:*'
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/service-role/AWSLambdaBasicExecutionRole
+
+Outputs:
+  ConfigureEKSControlPlaneLambdaArn:
+    Value: !GetAtt ConfigureEKSControlPlaneLambda.Arn
+    Export:
+      Name: ConfigureEKSControlPlaneLambdaArn

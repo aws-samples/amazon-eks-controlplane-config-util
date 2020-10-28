@@ -1,0 +1,59 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Description: >
+  This template demonstrates how to use CloudFormation custom resources to configure Amazon EKS Control plane's API Server access and logging.
+  It relies on 'cfn-configure-eks-control-plane' lambda function.
+  So, ensure that the lambda is deployed and it's ARN is exported to 'ConfigureEKSControlPlaneLambdaArn' in CloudFormation template.
+  Follow the instructions in README file to setup the pre-requisites before using this template.
+
+Parameters:
+  ClusterName:
+    Description: Enter the Amazon EKS Cluster name that should be updated.
+    Type: String
+
+  EndpointPublicAccess:
+    Type: String
+    Description: Set the value to True to enable API Server public access. Template disables it by default.
+    AllowedValues:
+      - 'True'
+      - 'False'
+    Default: 'False'
+
+  EndpointPrivateAccess:
+    Type: String
+    Description: Set the value to True to enable API Server private access. Template enables it by default.
+    AllowedValues:
+      - 'True'
+      - 'False'
+    Default: 'True'
+
+  PublicAccessCidrs:
+    Type: CommaDelimitedList
+    Description: List of CIDR blocks that are allowed access to cluster's public API server endpoint.
+    Default: '0.0.0.0/0'
+
+  ClusterLoggingTypes:
+    Type: CommaDelimitedList
+    Description: Allowed values are - api, audit, authenticator, controllerManager, scheduler
+    Default: 'api, audit, authenticator, controllerManager, scheduler'
+
+Resources:
+  ConfigureControlPlaneLogging:
+    Type: Custom::KubeManifest
+    Version: 1.0
+    Properties:
+      ServiceToken: !ImportValue ConfigureEKSControlPlaneLambdaArn
+      clusterName: !Ref ClusterName
+      clusterLoggingTypes: !Ref ClusterLoggingTypes
+      clusterUpdateType: 'LoggingUpdate'
+
+  ConfigureAPIServerAccess:
+    Type: Custom::KubeManifest
+    Version: 1.0
+    DependsOn: ConfigureControlPlaneLogging #Add the dependency on 'ConfigureControlPlaneLogging' to avoid updating Control Plane's API Server access and logging config at the same time. Updating both at the same time is not supported as of now.
+    Properties:
+      ServiceToken: !ImportValue ConfigureEKSControlPlaneLambdaArn
+      clusterName: !Ref ClusterName
+      endpointPublicAccess: !Ref EndpointPublicAccess
+      endpointPrivateAccess: !Ref EndpointPrivateAccess
+      clusterUpdateType: 'EndpointAccessUpdate'
+      publicAccessCidrs: !Ref PublicAccessCidrs
